@@ -1,0 +1,56 @@
+body, html {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f0f0f0;
+}
+
+.container-fluid {
+    height: 100%;
+}
+
+.chat-container {
+    width: 90%;
+    max-width: 800px;
+    text-align: center;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.wedding-gif {
+    width: 100%;
+    max-width: 1000px; /* Ajuste o tamanho máximo do GIF */
+    height: auto;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.chat-box {
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background-color: #f9f9f9;
+}
+
+.chat-title {
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.chat-text {
+    min-height: 50px;
+    font-size: 18px;
+    margin-bottom: 20px;
+}
+
+.response-input {
+    font-size: 16px;
+}
+
+.send-button {
+    width: 100%; /* Faz o botão ocupar toda a largura disponível */
+}
