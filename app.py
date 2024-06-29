@@ -1,8 +1,13 @@
 from flask import Flask, render_template, request, jsonify
-import pandas as pd
-import os
+import sqlite3
 
 app = Flask(__name__)
+
+# Conectando ao banco de dados SQLite
+def get_db_connection():
+    conn = sqlite3.connect('database.db')
+    conn.row_factory = sqlite3.Row  # Para que possamos acessar as colunas por nome
+    return conn
 
 @app.route('/')
 def index():
@@ -10,26 +15,40 @@ def index():
 
 @app.route('/submit', methods=['POST'])
 def submit():
-    data = request.json
+    try:
+        data = request.get_json()
+        nome = data.get('nome')
+        email = data.get('email')
+        evento = data.get('evento')
+        filhos = data.get('filhos')
+        idades = data.get('idades')
 
-    # Transformar o dicionário de respostas em uma linha de DataFrame
-    responses = {question: [answer] for question, answer in data.items()}
-    df = pd.DataFrame(responses)
+        # Conectando ao banco de dados e criando a tabela se não existir
+        conn = get_db_connection()
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS responses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL,
+                email TEXT NOT NULL,
+                evento TEXT NOT NULL,
+                filhos TEXT,
+                idades TEXT
+            )
+        ''')
 
-    # Verificar se o arquivo Excel existe
-    file_path = 'responses.xlsx'
-    if os.path.exists(file_path):
-        # Se o arquivo existe, carregar o DataFrame existente
-        existing_df = pd.read_excel(file_path)
-        # Concatenar o novo DataFrame ao existente
-        df = pd.concat([existing_df, df], ignore_index=True)
-    else:
-        # Se o arquivo não existe, criar um novo DataFrame com as respostas
-        df.to_excel(file_path, index=False)
+        # Inserindo os dados na tabela
+        conn.execute('''
+            INSERT INTO responses (nome, email, evento, filhos, idades)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (nome, email, evento, filhos, idades))
 
-    # Salvar o DataFrame atualizado de volta no arquivo Excel
-    df.to_excel(file_path, index=False)
-    return jsonify({'status': 'success'})
+        conn.commit()
+        conn.close()
 
-if __name__ == '__main__':
-    app.run()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000)
