@@ -1,15 +1,31 @@
 from flask import Flask, render_template, request, jsonify, send_file
-import sqlite3
+from sqlalchemy import create_engine, Column, Integer, String, Table, MetaData
+from sqlalchemy.orm import sessionmaker
 import pandas as pd
 import io
+import os
 
 app = Flask(__name__)
 
-# Conectando ao banco de dados SQLite
-def get_db_connection():
-    conn = sqlite3.connect('database.db', timeout=10)  # Adiciona timeout para evitar "database is locked"
-    conn.row_factory = sqlite3.Row  # Para que possamos acessar as colunas por nome
-    return conn
+# Configuração do banco de dados
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+engine = create_engine(DATABASE_URL)
+metadata = MetaData()
+
+# Definindo a tabela usando SQLAlchemy
+responses = Table(
+    'responses', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('nome', String, nullable=False),
+    Column('email', String, nullable=False),
+    Column('evento', String, nullable=False),
+    Column('filhos', String),
+    Column('idades', String)
+)
+
+metadata.create_all(engine)
+Session = sessionmaker(bind=engine)
 
 @app.route('/')
 def index():
@@ -28,25 +44,18 @@ def submit():
         if not nome or not email or not evento:
             return jsonify({'status': 'error', 'message': 'Campos obrigatórios não preenchidos'}), 400
 
-        # Conectando ao banco de dados e criando a tabela se não existir
-        conn = get_db_connection()
-        with conn:  # Usa o contexto de gerenciamento para garantir o fechamento da conexão
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS responses (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    nome TEXT NOT NULL,
-                    email TEXT NOT NULL,
-                    evento TEXT NOT NULL,
-                    filhos TEXT,
-                    idades TEXT
-                )
-            ''')
-
-            # Inserindo os dados na tabela
-            conn.execute('''
-                INSERT INTO responses (nome, email, evento, filhos, idades)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (nome, email, evento, filhos, idades))
+        session = Session()
+        session.execute(
+            responses.insert().values(
+                nome=nome,
+                email=email,
+                evento=evento,
+                filhos=filhos,
+                idades=idades
+            )
+        )
+        session.commit()
+        session.close()
 
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -56,11 +65,13 @@ def submit():
 @app.route('/export_to_excel')
 def export_to_excel():
     try:
-        conn = get_db_connection()
-        query = 'SELECT * FROM responses'
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        
+        session = Session()
+        query = session.query(responses).all()
+        session.close()
+
+        # Converting query result to DataFrame
+        df = pd.DataFrame([dict(row) for row in query])
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df.to_excel(writer, index=False, sheet_name='Respostas')
