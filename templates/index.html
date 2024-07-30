@@ -82,19 +82,37 @@
         }
 
         function submitResponses() {
-            fetch('/submit', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(responses)
-            })
-            .then(response => response.json())
-            .then(data => {
-                $('#success-modal').modal('show');
-                resetChat();
-            });
+    // Verifica se todos os campos obrigatórios estão preenchidos
+    if (!responses['Qual o seu nome?'] || !responses['Qual o seu email?'] || !responses['Você vem ao evento?']) {
+        alert('Por favor, preencha todos os campos obrigatórios!');
+        return;
+    }
+
+    fetch('/submit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            nome: responses['Qual o seu nome?'],
+            email: responses['Qual o seu email?'],
+            evento: responses['Você vem ao evento?'],
+            filhos: responses['Quais os nomes dos seus filhos?'] || '',
+            idades: responses['Quais as idades dos seus filhos?'] || ''
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            $('#success-modal').modal('show');
+            resetChat();
+        } else {
+            console.error('Erro ao enviar dados:', data.message);
         }
+    })
+    .catch(error => console.error('Erro ao enviar dados:', error));
+}
+
 
         function handleResponse() {
             const response = document.getElementById('response-input').value.trim();
@@ -121,6 +139,26 @@
             });
             document.getElementById('send-button').addEventListener('click', handleResponse);
         };
+
+        async function fetchResponses() {
+            try {
+                const response = await fetch('/get_responses');
+                const data = await response.json();
+                
+                let output = '<ul>';
+                data.forEach(item => {
+                    output += `<li>Nome: ${item.nome}, Email: ${item.email}, Evento: ${item.evento}, Filhos: ${item.filhos}, Idades: ${item.idades}</li>`;
+                });
+                output += '</ul>';
+                
+                document.getElementById('responses').innerHTML = output;
+            } catch (error) {
+                console.error('Erro ao buscar dados:', error);
+            }
+        }
     </script>
+    <!-- <h1>Bem-vindo ao sistema de respostas</h1>
+    <button onclick="fetchResponses()">Consultar Dados</button>
+    <div id="responses"></div> -->
 </body>
 </html>
