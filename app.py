@@ -1,20 +1,18 @@
-import os
-import json
 from flask import Flask, render_template, request, jsonify, send_file
 import firebase_admin
 from firebase_admin import credentials, firestore
 import pandas as pd
 import io
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Carregar variáveis de ambiente do arquivo .env
 
 app = Flask(__name__)
 
 # Configuração do Firebase
-firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
-if not firebase_credentials:
-    raise ValueError("Firebase credentials not set in environment variables")
-
-cred_dict = json.loads(firebase_credentials)
-cred = credentials.Certificate(cred_dict)
+firebase_credentials_path = os.getenv('FIREBASE_CREDENTIALS')
+cred = credentials.Certificate(firebase_credentials_path)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
@@ -55,12 +53,12 @@ def export_to_excel():
         responses_ref = db.collection('responses')
         docs = responses_ref.stream()
 
-        # Converting Firestore documents to a list of dictionaries
+        # Convertendo documentos do Firestore para uma lista de dicionários
         responses_list = []
         for doc in docs:
             responses_list.append(doc.to_dict())
 
-        # Converting list of dictionaries to DataFrame
+        # Convertendo lista de dicionários para DataFrame
         df = pd.DataFrame(responses_list)
 
         output = io.BytesIO()
