@@ -1,31 +1,22 @@
+import os
+import json
 from flask import Flask, render_template, request, jsonify, send_file
-from sqlalchemy import create_engine, Column, Integer, String, Table, MetaData
-from sqlalchemy.orm import sessionmaker
+import firebase_admin
+from firebase_admin import credentials, firestore
 import pandas as pd
 import io
-import os
 
 app = Flask(__name__)
 
-# Configuração do banco de dados
-DATABASE_URL = os.getenv('DATABASE_URL')
+# Configuração do Firebase
+firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
+if not firebase_credentials:
+    raise ValueError("Firebase credentials not set in environment variables")
 
-engine = create_engine(DATABASE_URL)
-metadata = MetaData()
-
-# Definindo a tabela usando SQLAlchemy
-responses = Table(
-    'responses', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('nome', String, nullable=False),
-    Column('email', String, nullable=False),
-    Column('evento', String, nullable=False),
-    Column('filhos', String),
-    Column('idades', String)
-)
-
-metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
+cred_dict = json.loads(firebase_credentials)
+cred = credentials.Certificate(cred_dict)
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 @app.route('/')
 def index():
@@ -44,18 +35,14 @@ def submit():
         if not nome or not email or not evento:
             return jsonify({'status': 'error', 'message': 'Campos obrigatórios não preenchidos'}), 400
 
-        session = Session()
-        session.execute(
-            responses.insert().values(
-                nome=nome,
-                email=email,
-                evento=evento,
-                filhos=filhos,
-                idades=idades
-            )
-        )
-        session.commit()
-        session.close()
+        doc_ref = db.collection('responses').document()
+        doc_ref.set({
+            'nome': nome,
+            'email': email,
+            'evento': evento,
+            'filhos': filhos,
+            'idades': idades
+        })
 
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -65,12 +52,16 @@ def submit():
 @app.route('/export_to_excel')
 def export_to_excel():
     try:
-        session = Session()
-        query = session.query(responses).all()
-        session.close()
+        responses_ref = db.collection('responses')
+        docs = responses_ref.stream()
 
-        # Converting query result to DataFrame
-        df = pd.DataFrame([dict(row) for row in query])
+        # Converting Firestore documents to a list of dictionaries
+        responses_list = []
+        for doc in docs:
+            responses_list.append(doc.to_dict())
+
+        # Converting list of dictionaries to DataFrame
+        df = pd.DataFrame(responses_list)
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
